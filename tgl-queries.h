@@ -266,7 +266,7 @@ void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location 
 // id type of id is UNKNOWN uses global search (in all dialogs) instead
 // if *from* or *to* is means *from*=0 and *to*=+INF
 // return up to *limit* entries from offset=*offset*
-void tgl_do_msg_search (struct tgl_state *TLS, tgl_user_or_chat_id_t id, int from, int to, int limit, int offset, const char *query, int query_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
+void tgl_do_msg_search (struct tgl_state *TLS, tgl_user_or_chat_id_t id, long long mediaFilter, int from, int to, int limit, int offset, const char *query, int query_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
 
 // deletes message *id*
 void tgl_do_delete_msg (struct tgl_state *TLS, tgl_message_id_t *msg_id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);

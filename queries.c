@@ -3545,7 +3545,7 @@ struct msg_search_extra {
   char *query;
 };
 
-static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
+static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *E, long long media_filter, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
 
 static int msg_search_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_messages *DS_MM = D;
@@ -3595,7 +3595,7 @@ static int msg_search_on_answer (struct tgl_state *TLS, struct query *q, void *D
   } else {
     E->max_id = E->ML[E->list_offset - 1]->permanent_id.id;
     E->offset = 0;
-    _tgl_do_msg_search (TLS, E, q->callback, q->callback_extra);
+    _tgl_do_msg_search (TLS, E, CODE_input_messages_filter_empty, q->callback, q->callback_extra);
   }
   return 0;
 }
@@ -3620,7 +3620,7 @@ static struct query_methods msg_search_methods = {
   .name = "messages search"
 };
 
-static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
+static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *E, long long media_filter, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
   clear_packet ();
   if (tgl_get_peer_type (E->id) == TGL_PEER_UNKNOWN) {
     out_int (CODE_messages_search_global);
@@ -3635,7 +3635,8 @@ static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *
     out_peer_id (TLS, E->id);
 
     out_string (E->query);
-    out_int (CODE_input_messages_filter_empty);
+    /* out_int (CODE_input_messages_filter_empty); */
+    out_int (media_filter);
     out_int (E->from);
     out_int (E->to);
     out_int (E->offset); // offset
@@ -3645,7 +3646,7 @@ static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_search_methods, E, callback, callback_extra);
 }
 
-void tgl_do_msg_search (struct tgl_state *TLS, tgl_peer_id_t id, int from, int to, int limit, int offset, const char *pattern, int pattern_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
+void tgl_do_msg_search (struct tgl_state *TLS, tgl_peer_id_t id, long long media_filter, int from, int to, int limit, int offset, const char *pattern, int pattern_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
   if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT) {
     tgl_set_query_error (TLS, EINVAL, "can not search in secret chats");
     if (callback) {
@@ -3661,7 +3662,7 @@ void tgl_do_msg_search (struct tgl_state *TLS, tgl_peer_id_t id, int from, int t
   E->offset = offset;
   E->query = tstrndup (pattern, pattern_len);
 
-  _tgl_do_msg_search (TLS, E, callback, callback_extra);
+  _tgl_do_msg_search (TLS, E, media_filter, callback, callback_extra);
 }
 /* }}} */
 
