@@ -3223,6 +3223,7 @@ static int read_on_answer (struct tgl_state *TLS, struct query *q, void *DD) {
     read_data->bytes = talloc (len*sizeof(char));
     memcpy (read_data->bytes, DS_UF->bytes->data, len);
     read_data->len = len;
+    ((void (*)(struct tgl_state *, void *, int))q->callback) (TLS, (void*)read_data, 1);
   }
 
   D->refcnt --;
