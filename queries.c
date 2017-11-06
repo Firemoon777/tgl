@@ -3197,6 +3197,65 @@ static struct query_methods download_methods = {
   .name = "download part"
 };
 
+static int read_on_answer (struct tgl_state *TLS, struct query *q, void *DD) {
+  struct tl_ds_upload_file *DS_UF = DD;
+
+  struct download *D = q->extra;
+
+  int len = DS_UF->bytes->len;
+  TLS->cur_downloaded_bytes += len;
+
+  if (D->iv) {
+    assert (!(len & 15));
+    void *ptr = DS_UF->bytes->data;
+
+    TGLC_aes_key aes_key;
+    TGLC_aes_set_decrypt_key (D->key, 256, &aes_key);
+    TGLC_aes_ige_encrypt (ptr, ptr, len, &aes_key, D->iv, 0);
+    memset (&aes_key, 0, sizeof (aes_key));
+    if (len > D->size - D->offset) {
+      len = D->size - D->offset;
+    }
+    assert (write (D->fd, ptr, len) == len);
+  } else {
+    struct tgl_read_data *read_data = (struct tgl_read_data *)q->callback_extra;
+
+    read_data->bytes = talloc (len*sizeof(char));
+    memcpy (read_data->bytes, DS_UF->bytes->data, len);
+    read_data->len = len;
+  }
+
+  D->refcnt --;
+  return 0;
+}
+
+static int read_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
+  tgl_set_query_error (TLS, EPROTO, "RPC_CALL_FAIL %d: %.*s", error_code, error_len, error);
+
+  struct download *D = q->extra;
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback) (TLS, q->callback_extra, 0);
+  }
+
+  if (D->iv) {
+    tfree_secure (D->iv, 32);
+  }
+  tfree_str (D->name);
+  if (D->ext) {
+    tfree_str (D->ext);
+  }
+  tfree (D, sizeof (*D));
+  return 0;
+}
+
+static struct query_methods read_methods = {
+  .on_answer = read_on_answer,
+  .on_error = read_on_error,
+  .type = TYPE_TO_PARAM(upload_file),
+  .name = "read part"
+};
+
 static void load_next_part (struct tgl_state *TLS, struct download *D, void *callback, void *callback_extra) {
   if (!D->offset) {
     static char buf[PATH_MAX];
@@ -3252,6 +3311,30 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
   out_int (D->size ? (1 << 14) : (1 << 19));
   tglq_send_query (TLS, TLS->DC_list[D->dc], packet_ptr - packet_buffer, packet_buffer, &download_methods, D, callback, callback_extra);
   //tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &download_methods, D);
+}
+
+static void read_next_part (struct tgl_state *TLS, struct download *D, void *callback, void *callback_extra) {
+  D->refcnt ++;
+  clear_packet ();
+  out_int (CODE_upload_get_file);
+  if (!D->id) {
+    out_int (CODE_input_file_location);
+    out_long (D->volume);
+    out_int (D->local_id);
+    out_long (D->secret);
+  } else {
+    if (D->iv) {
+      out_int (CODE_input_encrypted_file_location);
+    } else {
+      out_int (D->type);
+    }
+    out_long (D->id);
+    out_long (D->access_hash);
+  }
+  out_int (D->offset);
+  out_int (D->size ? (1 << 14) : (1 << 19));
+  tglq_send_query (TLS, TLS->DC_list[D->dc], packet_ptr - packet_buffer, packet_buffer, &read_methods, D, callback, callback_extra);
+  //tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &read_methods, D);
 }
 
 void tgl_do_load_photo_size (struct tgl_state *TLS, struct tgl_photo_size *P, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
@@ -3343,6 +3426,25 @@ static void _tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V
   load_next_part (TLS, D, callback, callback_extra);
 }
 
+static void _tgl_do_read_document (struct tgl_state *TLS, struct tgl_document *V, struct download *D, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  assert (V);
+  D->offset = 0;
+  D->size = V->size;
+  D->id = V->id;
+  D->access_hash = V->access_hash;
+  D->dc = V->dc_id;
+  D->name = 0;
+  D->fd = -1;
+  
+  if (V->mime_type) {
+    char *r = tg_extension_by_mime (V->mime_type);
+    if (r) {
+      D->ext = tstrdup (r);
+    }
+  }
+  read_next_part (TLS, D, callback, callback_extra);
+}
+
 void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
   
   struct download *D = talloc0 (sizeof (*D));
@@ -3365,6 +3467,14 @@ void tgl_do_load_audio (struct tgl_state *TLS, struct tgl_document *V, void (*ca
   D->type = CODE_input_audio_file_location;
 
   _tgl_do_load_document (TLS, V, D, callback, callback_extra);
+}
+
+void tgl_do_read_audio (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  
+  struct download *D = talloc0 (sizeof (*D));
+  D->type = CODE_input_audio_file_location;
+
+  _tgl_do_read_document (TLS, V, D, callback, callback_extra);
 }
 
 void tgl_do_load_encr_document (struct tgl_state *TLS, struct tgl_encr_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {

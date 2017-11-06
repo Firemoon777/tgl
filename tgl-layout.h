@@ -640,5 +640,10 @@ struct tgl_message {
     };
   };
 };
+
+struct tgl_read_data {
+  char *bytes;
+  int len;
+};
 #pragma pack(pop)
 #endif
