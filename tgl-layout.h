@@ -642,6 +642,8 @@ struct tgl_message {
 };
 
 struct tgl_read_data {
+  int offset;
+  int success;
   char *bytes;
   int len;
 };
