@@ -3334,7 +3334,8 @@ static void read_next_part (struct tgl_state *TLS, struct download *D, void *cal
   }
   struct tgl_read_data *data = (struct tgl_read_data *)callback_extra;
   out_int (data->offset);
-  out_int (D->size ? (1 << 14) : (1 << 19));
+  //out_int (D->size ? (1 << 14) : (1 << 19));
+  out_int (data->len);
   tglq_send_query (TLS, TLS->DC_list[D->dc], packet_ptr - packet_buffer, packet_buffer, &read_methods, D, callback, callback_extra);
   //tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &read_methods, D);
 }
