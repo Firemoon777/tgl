@@ -646,6 +646,7 @@ struct tgl_read_data {
   int success;
   char *bytes;
   int len;
+  void *mutex;
 };
 #pragma pack(pop)
 #endif
