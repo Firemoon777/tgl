@@ -3109,6 +3109,12 @@ static void end_load (struct tgl_state *TLS, struct download *D, void *callback,
   tfree (D, sizeof (*D));
 }
 
+static void end_read (struct tgl_state *TLS, struct download *D, void *callback, void *callback_extra) {
+  if(callback) {
+    ((void (*)(struct tgl_state *, void *, int, char *))callback) (TLS, callback_extra, 1, D->name);
+  }
+}
+
 static void load_next_part (struct tgl_state *TLS, struct download *D, void *callback, void *callback_extra);
 static int download_on_answer (struct tgl_state *TLS, struct query *q, void *DD) {
   struct tl_ds_upload_file *DS_UF = DD;
@@ -3223,6 +3229,9 @@ static int read_on_answer (struct tgl_state *TLS, struct query *q, void *DD) {
     read_data->bytes = talloc (len*sizeof(char));
     memcpy (read_data->bytes, DS_UF->bytes->data, len);
     read_data->len = len;
+    if(D->size < read_data->offset) {
+      read_data->len = 0;
+    }
     ((void (*)(struct tgl_state *, void *, int))q->callback) (TLS, (void*)read_data, 1);
   }
 
@@ -3332,7 +3341,14 @@ static void read_next_part (struct tgl_state *TLS, struct download *D, void *cal
     out_long (D->id);
     out_long (D->access_hash);
   }
+
   struct tgl_read_data *data = (struct tgl_read_data *)callback_extra;
+
+  if (D->offset >= D->size) {
+    end_read (TLS, D, callback, callback_extra);
+    return;
+  }
+
   out_int (data->offset);
   //out_int (D->size ? (1 << 14) : (1 << 19));
   out_int (data->len);
