@@ -296,6 +296,7 @@ void tgl_do_start_bot (struct tgl_state *TLS, tgl_peer_id_t bot, tgl_peer_id_t c
 /* {{{ TGFS QUERIES */
 
 void tgl_do_read_audio (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+void tgl_do_read_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
 /* }}} */
 #endif

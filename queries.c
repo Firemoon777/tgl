@@ -3472,6 +3472,14 @@ void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (
   _tgl_do_load_document (TLS, V, D, callback, callback_extra);
 }
 
+void tgl_do_read_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  
+  struct download *D = talloc0 (sizeof (*D));
+  D->type = CODE_input_document_file_location;
+  
+  _tgl_do_read_document (TLS, V, D, callback, callback_extra);
+}
+
 void tgl_do_load_video (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
 
   struct download *D = talloc0 (sizeof (*D));
